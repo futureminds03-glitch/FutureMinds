@@ -1,0 +1,48 @@
+name: FutureMinds static site checks
+
+on:
+  push:
+    branches:
+      - futureminds/brand-conversion
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Normalize exported pages
+        run: node scripts/prepare-site.mjs
+
+      - name: Validate static site
+        run: node scripts/check-site.mjs
+
+      - name: Ensure pull request is already normalized
+        if: github.event_name == 'pull_request'
+        run: git diff --exit-code
+
+      - name: Commit normalized pages
+        if: github.event_name == 'push'
+        run: |
+          if ! git diff --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add -- '*.html'
+            git commit -m "Remove remaining template artifacts and secure contact forms"
+            git push
+          fi
